@@ -14,12 +14,17 @@ html, body {
 }
 body {
   margin: 0;
+  overflow-x: hidden;
   min-height: 100vh;
   font-family: Inter, "Noto Sans SC", system-ui, sans-serif;
   color: var(--text);
   background: radial-gradient(circle at top, #1d4ed8, #111827 55%, #020617 100%);
 }
 button { font: inherit; }
+button, .board, .tile {
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
 .app { max-width: 1180px; margin: 0 auto; padding: 18px; }
 .panel {
   background: var(--panel);

@@ -230,7 +230,7 @@ function handleBoardPointerDown(e) {
   if (!tile) return;
   e.preventDefault();
   boardEl.setPointerCapture?.(e.pointerId);
-  gesture = { startX: e.clientX, startY: e.clientY, r: tile.r, c: tile.c, pointerId: e.pointerId, moved: false };
+  gesture = { startX: e.clientX, startY: e.clientY, lastX: e.clientX, lastY: e.clientY, r: tile.r, c: tile.c, pointerId: e.pointerId };
   tile.el.classList.add('selected');
 }
 
@@ -238,24 +238,25 @@ function handleBoardPointerMove(e) {
   if (!gesture || busy) return;
   if (e.pointerId !== gesture.pointerId) return;
   e.preventDefault();
-  const dx = e.clientX - gesture.startX;
-  const dy = e.clientY - gesture.startY;
-  if (Math.abs(dx) < SWIPE_THRESHOLD && Math.abs(dy) < SWIPE_THRESHOLD) return;
-  gesture.moved = true;
-  let target;
-  if (Math.abs(dx) > Math.abs(dy)) target = { r: gesture.r, c: gesture.c + (dx > 0 ? 1 : -1) };
-  else target = { r: gesture.r + (dy > 0 ? 1 : -1), c: gesture.c };
-  const from = { r: gesture.r, c: gesture.c };
-  clearGesture();
-  if (target.r < 0 || target.r >= rows || target.c < 0 || target.c >= cols) return;
-  makeMove(from, target);
+  gesture.lastX = e.clientX;
+  gesture.lastY = e.clientY;
 }
 
 function handleBoardPointerEnd(e) {
   if (!gesture) return;
   if (e.pointerId !== gesture.pointerId) return;
+  e.preventDefault();
   try { boardEl.releasePointerCapture?.(e.pointerId); } catch {}
+  const dx = (gesture.lastX ?? e.clientX) - gesture.startX;
+  const dy = (gesture.lastY ?? e.clientY) - gesture.startY;
+  const from = { r: gesture.r, c: gesture.c };
   clearGesture();
+  if (Math.abs(dx) < SWIPE_THRESHOLD && Math.abs(dy) < SWIPE_THRESHOLD) return;
+  let target;
+  if (Math.abs(dx) > Math.abs(dy)) target = { r: from.r, c: from.c + (dx > 0 ? 1 : -1) };
+  else target = { r: from.r + (dy > 0 ? 1 : -1), c: from.c };
+  if (target.r < 0 || target.r >= rows || target.c < 0 || target.c >= cols) return;
+  makeMove(from, target);
 }
 
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
@@ -268,6 +269,7 @@ boardEl.addEventListener('pointerdown', handleBoardPointerDown, { passive: false
 boardEl.addEventListener('pointermove', handleBoardPointerMove, { passive: false });
 boardEl.addEventListener('pointerup', handleBoardPointerEnd, { passive: false });
 boardEl.addEventListener('pointercancel', handleBoardPointerEnd, { passive: false });
+boardEl.addEventListener('lostpointercapture', () => clearGesture(), { passive: true });
 boardEl.addEventListener('dragstart', (e) => e.preventDefault());
 newGameBtn.addEventListener('click', newGame);
 newGame();
