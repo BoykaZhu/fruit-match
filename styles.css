@@ -40,6 +40,8 @@ button { font: inherit; }
   width: min(100%, 540px); aspect-ratio: 6 / 8;
   display: grid; grid-template-columns: repeat(6, 1fr); grid-template-rows: repeat(8, 1fr);
   gap: 8px; margin: 0 auto; position: relative;
+  touch-action: none;
+  overscroll-behavior: contain;
 }
 .tile {
   border: none; border-radius: 20px; background: linear-gradient(180deg, #334155, #1e293b);

@@ -56,13 +56,17 @@ function render() {
 function attachPointerHandlers(btn, r, c) {
   btn.addEventListener('pointerdown', (e) => {
     if (busy || movesLeft <= 0) return;
-    pointerStart = { x: e.clientX, y: e.clientY, r, c };
+    e.preventDefault();
+    btn.setPointerCapture?.(e.pointerId);
+    pointerStart = { x: e.clientX, y: e.clientY, r, c, pointerId: e.pointerId };
     activeTile = { r, c };
     btn.classList.add('selected');
   });
 
   btn.addEventListener('pointermove', (e) => {
     if (!pointerStart || busy) return;
+    if (pointerStart.pointerId !== undefined && e.pointerId !== pointerStart.pointerId) return;
+    e.preventDefault();
     const dx = e.clientX - pointerStart.x;
     const dy = e.clientY - pointerStart.y;
     if (Math.abs(dx) < SWIPE_THRESHOLD && Math.abs(dy) < SWIPE_THRESHOLD) return;
@@ -79,7 +83,11 @@ function attachPointerHandlers(btn, r, c) {
     makeMove({ r: r, c: c }, target);
   });
 
-  const end = () => clearPointerState();
+  const end = (e) => {
+    if (pointerStart?.pointerId !== undefined && e?.pointerId !== undefined && e.pointerId !== pointerStart.pointerId) return;
+    try { btn.releasePointerCapture?.(e.pointerId); } catch {}
+    clearPointerState();
+  };
   btn.addEventListener('pointerup', end);
   btn.addEventListener('pointercancel', end);
   btn.addEventListener('pointerleave', () => {
