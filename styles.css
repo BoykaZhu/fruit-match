@@ -1,12 +1,9 @@
 :root {
-  --bg1: #0f172a;
-  --bg2: #111827;
-  --panel: rgba(15, 23, 42, 0.84);
+  --panel: rgba(15, 23, 42, 0.86);
   --border: rgba(148, 163, 184, 0.18);
   --text: #eef2ff;
   --muted: #a5b4fc;
   --accent: #f472b6;
-  --tile: #1f2937;
   --tile-selected: #60a5fa;
 }
 * { box-sizing: border-box; }
@@ -18,7 +15,7 @@ body {
   background: radial-gradient(circle at top, #1d4ed8, #111827 55%, #020617 100%);
 }
 button { font: inherit; }
-.app { max-width: 1200px; margin: 0 auto; padding: 18px; }
+.app { max-width: 1180px; margin: 0 auto; padding: 18px; }
 .panel {
   background: var(--panel);
   border: 1px solid var(--border);
@@ -34,31 +31,48 @@ button { font: inherit; }
   border: none; border-radius: 14px; padding: .9rem 1.1rem; color: white; cursor: pointer;
   background: linear-gradient(135deg, #ec4899, #8b5cf6);
 }
-.layout { display: grid; grid-template-columns: minmax(280px, 1fr) 300px; gap: 18px; }
+.layout { display: grid; grid-template-columns: minmax(260px, 760px) 300px; gap: 18px; align-items: start; }
 .board-panel { padding: 18px; }
 .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
-.stats > div { background: rgba(255,255,255,.04); padding: 12px; border-radius: 16px; }
-.stats strong { display: block; margin-top: 4px; font-size: 1.3rem; }
+.stats > div { background: rgba(255,255,255,.05); padding: 12px; border-radius: 16px; }
+.stats strong { display: block; margin-top: 4px; font-size: 1.28rem; }
 .board {
-  width: min(100%, 720px); aspect-ratio: 1;
-  display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr);
-  gap: 6px; margin: 0 auto;
+  width: min(100%, 540px); aspect-ratio: 6 / 8;
+  display: grid; grid-template-columns: repeat(6, 1fr); grid-template-rows: repeat(8, 1fr);
+  gap: 8px; margin: 0 auto; position: relative;
 }
 .tile {
-  border: none; border-radius: 18px; background: linear-gradient(180deg, #334155, #1e293b);
+  border: none; border-radius: 20px; background: linear-gradient(180deg, #334155, #1e293b);
   display: flex; align-items: center; justify-content: center;
-  font-size: clamp(1.7rem, 5vw, 3rem); cursor: pointer; user-select: none;
-  aspect-ratio: 1; width: 100%; height: 100%; transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 6px 12px rgba(0,0,0,.18);
+  font-size: clamp(2rem, 5vw, 3.1rem); cursor: pointer; user-select: none;
+  width: 100%; height: 100%; aspect-ratio: 1;
+  transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 8px 14px rgba(0,0,0,.22);
   will-change: transform, opacity;
+  position: relative;
+  overflow: hidden;
+}
+.tile::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.18), transparent 45%);
 }
 .tile:hover { transform: translateY(-1px); }
 .tile.selected { outline: 3px solid var(--tile-selected); transform: scale(1.03); }
-.tile.clearing { transform: scale(.82); opacity: .35; }
+.particle {
+  position: absolute; width: 12px; height: 12px; border-radius: 999px; pointer-events: none;
+  animation: pop .52s ease-out forwards;
+}
 .sidebar { display: grid; gap: 16px; }
 .card { padding: 18px; }
+.glass { background: rgba(15, 23, 42, .7); }
 .card ul { margin: 0; padding-left: 18px; line-height: 1.7; }
-#statusText { color: #e2e8f0; line-height: 1.6; }
+#statusText { color: #e2e8f0; line-height: 1.6; min-height: 4.8em; }
+.combo-chip { margin-top: 12px; display: inline-flex; gap: 6px; align-items: center; background: rgba(244,114,182,.16); color: #fbcfe8; padding: 8px 12px; border-radius: 999px; }
+@keyframes pop {
+  0% { transform: translate(0,0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(.2); opacity: 0; }
+}
 @media (max-width: 960px) {
   .layout { grid-template-columns: 1fr; }
 }
@@ -67,6 +81,6 @@ button { font: inherit; }
   .hero, .board-panel, .card { padding: 14px; }
   .hero { flex-direction: column; align-items: flex-start; }
   .stats { grid-template-columns: repeat(2, 1fr); }
-  .board { gap: 4px; }
-  .tile { border-radius: 14px; font-size: clamp(1.4rem, 8vw, 2.3rem); }
+  .board { width: min(100%, 440px); gap: 6px; }
+  .tile { border-radius: 16px; font-size: clamp(1.7rem, 8vw, 2.5rem); }
 }

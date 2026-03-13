@@ -15,7 +15,7 @@
       <div>
         <p class="eyebrow">GitHub Pages 演示</p>
         <h1>水果消消乐</h1>
-        <p class="subtitle">交换相邻水果，连成 3 个及以上即可消除。支持分数、连击、计步与手机端优化。</p>
+        <p class="subtitle">6 列紧凑棋盘，带交换动画、下落动画、爆炸特效、关卡目标和精修 UI。</p>
       </div>
       <div class="hero-actions">
         <button id="newGameBtn" class="primary">新开一局</button>
@@ -25,26 +25,27 @@
     <section class="layout">
       <section class="board-panel panel">
         <div class="stats">
+          <div><span class="label">关卡</span><strong id="level">1</strong></div>
           <div><span class="label">分数</span><strong id="score">0</strong></div>
-          <div><span class="label">步数</span><strong id="moves">20</strong></div>
-          <div><span class="label">连击</span><strong id="combo">0</strong></div>
-          <div><span class="label">目标</span><strong id="goal">2500</strong></div>
+          <div><span class="label">步数</span><strong id="moves">18</strong></div>
+          <div><span class="label">目标</span><strong id="goal">1800</strong></div>
         </div>
         <div id="board" class="board" aria-label="水果棋盘"></div>
       </section>
 
       <aside class="sidebar">
-        <section class="panel card">
+        <section class="panel card glass">
           <h3>玩法</h3>
           <ul>
             <li>点击两个相邻水果进行交换</li>
-            <li>3 连消除得分，4 连/5 连得分更高</li>
-            <li>步数用完前达到目标分数即可获胜</li>
+            <li>3 连及以上自动消除并掉落补位</li>
+            <li>在限定步数内达到目标分数即可升关</li>
           </ul>
         </section>
-        <section class="panel card">
+        <section class="panel card glass">
           <h3>状态</h3>
           <p id="statusText">准备开始，来一局吧 🍓</p>
+          <div class="combo-chip">连击：<span id="combo">0</span></div>
         </section>
       </aside>
     </section>
