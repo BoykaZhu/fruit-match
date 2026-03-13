@@ -20,8 +20,7 @@ let combo = 0;
 let level = 1;
 let busy = false;
 let audioCtx = null;
-let pointerStart = null;
-let activeTile = null;
+let gesture = null;
 
 function goalScore() { return baseGoal + (level - 1) * 700; }
 function allowedMoves() { return Math.max(10, baseMoves - (level - 1)); }
@@ -39,10 +38,11 @@ function render() {
       const btn = document.createElement('button');
       btn.className = 'tile';
       btn.type = 'button';
+      btn.draggable = false;
       btn.dataset.row = r;
       btn.dataset.col = c;
+      if (gesture && gesture.r === r && gesture.c === c) btn.classList.add('selected');
       btn.textContent = board[r][c];
-      attachPointerHandlers(btn, r, c);
       boardEl.appendChild(btn);
     }
   }
@@ -51,54 +51,6 @@ function render() {
   comboEl.textContent = combo;
   goalEl.textContent = goalScore();
   levelEl.textContent = level;
-}
-
-function attachPointerHandlers(btn, r, c) {
-  btn.addEventListener('pointerdown', (e) => {
-    if (busy || movesLeft <= 0) return;
-    e.preventDefault();
-    btn.setPointerCapture?.(e.pointerId);
-    pointerStart = { x: e.clientX, y: e.clientY, r, c, pointerId: e.pointerId };
-    activeTile = { r, c };
-    btn.classList.add('selected');
-  });
-
-  btn.addEventListener('pointermove', (e) => {
-    if (!pointerStart || busy) return;
-    if (pointerStart.pointerId !== undefined && e.pointerId !== pointerStart.pointerId) return;
-    e.preventDefault();
-    const dx = e.clientX - pointerStart.x;
-    const dy = e.clientY - pointerStart.y;
-    if (Math.abs(dx) < SWIPE_THRESHOLD && Math.abs(dy) < SWIPE_THRESHOLD) return;
-
-    let target = null;
-    if (Math.abs(dx) > Math.abs(dy)) {
-      target = { r: pointerStart.r, c: pointerStart.c + (dx > 0 ? 1 : -1) };
-    } else {
-      target = { r: pointerStart.r + (dy > 0 ? 1 : -1), c: pointerStart.c };
-    }
-
-    clearPointerState();
-    if (target.r < 0 || target.r >= rows || target.c < 0 || target.c >= cols) return;
-    makeMove({ r: r, c: c }, target);
-  });
-
-  const end = (e) => {
-    if (pointerStart?.pointerId !== undefined && e?.pointerId !== undefined && e.pointerId !== pointerStart.pointerId) return;
-    try { btn.releasePointerCapture?.(e.pointerId); } catch {}
-    clearPointerState();
-  };
-  btn.addEventListener('pointerup', end);
-  btn.addEventListener('pointercancel', end);
-  btn.addEventListener('pointerleave', () => {
-    if (!pointerStart) btn.classList.remove('selected');
-  });
-}
-
-function clearPointerState() {
-  pointerStart = null;
-  activeTile = null;
-  document.querySelectorAll('.tile.selected').forEach(el => el.classList.remove('selected'));
 }
 
 function getTileEl({ r, c }) {
@@ -110,6 +62,17 @@ function cellDelta() {
   if (!first) return { x: 0, y: 0 };
   const gap = parseFloat(getComputedStyle(boardEl).gap || '0');
   return { x: first.offsetWidth + gap, y: first.offsetHeight + gap };
+}
+
+function tileFromPoint(clientX, clientY) {
+  const el = document.elementFromPoint(clientX, clientY)?.closest?.('.tile');
+  if (!el || !boardEl.contains(el)) return null;
+  return { r: Number(el.dataset.row), c: Number(el.dataset.col), el };
+}
+
+function clearGesture() {
+  gesture = null;
+  document.querySelectorAll('.tile.selected').forEach(el => el.classList.remove('selected'));
 }
 
 function animateSwap(a, b, duration = 180) {
@@ -235,7 +198,6 @@ async function makeMove(a, b) {
     playSound('clear');
     burst(matches);
     await sleep(260);
-
     const drops = refillMatched(matches, true);
     render();
     await sleep(80);
@@ -262,17 +224,50 @@ async function makeMove(a, b) {
   busy = false;
 }
 
-function newGame() {
-  score = 0;
-  combo = 0;
-  level = 1;
-  busy = false;
-  movesLeft = allowedMoves();
-  clearPointerState();
-  initBoard();
-  statusText.textContent = '新游戏开始，按住水果往相邻方向滑动即可交换 🍇';
-  render();
+function handleBoardPointerDown(e) {
+  if (busy || movesLeft <= 0) return;
+  const tile = tileFromPoint(e.clientX, e.clientY);
+  if (!tile) return;
+  e.preventDefault();
+  boardEl.setPointerCapture?.(e.pointerId);
+  gesture = { startX: e.clientX, startY: e.clientY, r: tile.r, c: tile.c, pointerId: e.pointerId, moved: false };
+  tile.el.classList.add('selected');
 }
 
+function handleBoardPointerMove(e) {
+  if (!gesture || busy) return;
+  if (e.pointerId !== gesture.pointerId) return;
+  e.preventDefault();
+  const dx = e.clientX - gesture.startX;
+  const dy = e.clientY - gesture.startY;
+  if (Math.abs(dx) < SWIPE_THRESHOLD && Math.abs(dy) < SWIPE_THRESHOLD) return;
+  gesture.moved = true;
+  let target;
+  if (Math.abs(dx) > Math.abs(dy)) target = { r: gesture.r, c: gesture.c + (dx > 0 ? 1 : -1) };
+  else target = { r: gesture.r + (dy > 0 ? 1 : -1), c: gesture.c };
+  const from = { r: gesture.r, c: gesture.c };
+  clearGesture();
+  if (target.r < 0 || target.r >= rows || target.c < 0 || target.c >= cols) return;
+  makeMove(from, target);
+}
+
+function handleBoardPointerEnd(e) {
+  if (!gesture) return;
+  if (e.pointerId !== gesture.pointerId) return;
+  try { boardEl.releasePointerCapture?.(e.pointerId); } catch {}
+  clearGesture();
+}
+
+function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+function newGame() {
+  score = 0; combo = 0; level = 1; busy = false; movesLeft = allowedMoves(); clearGesture(); initBoard();
+  statusText.textContent = '新游戏开始，按住水果往相邻方向滑动即可交换 🍇'; render();
+}
+
+boardEl.addEventListener('pointerdown', handleBoardPointerDown, { passive: false });
+boardEl.addEventListener('pointermove', handleBoardPointerMove, { passive: false });
+boardEl.addEventListener('pointerup', handleBoardPointerEnd, { passive: false });
+boardEl.addEventListener('pointercancel', handleBoardPointerEnd, { passive: false });
+boardEl.addEventListener('dragstart', (e) => e.preventDefault());
 newGameBtn.addEventListener('click', newGame);
 newGame();
