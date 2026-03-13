@@ -34,6 +34,8 @@ function render() {
       const btn = document.createElement('button');
       btn.className = 'tile';
       btn.type = 'button';
+      btn.dataset.row = r;
+      btn.dataset.col = c;
       if (selected && selected.r === r && selected.c === c) btn.classList.add('selected');
       btn.textContent = board[r][c];
       btn.addEventListener('click', () => onTileClick(r, c));
@@ -44,6 +46,49 @@ function render() {
   movesEl.textContent = movesLeft;
   comboEl.textContent = combo;
   goalEl.textContent = goalScore;
+}
+
+function getTileEl({ r, c }) {
+  return boardEl.querySelector(`.tile[data-row="${r}"][data-col="${c}"]`);
+}
+
+function cellDelta() {
+  const first = boardEl.querySelector('.tile');
+  if (!first) return { x: 0, y: 0 };
+  const gap = parseFloat(getComputedStyle(boardEl).gap || '0');
+  return { x: first.offsetWidth + gap, y: first.offsetHeight + gap };
+}
+
+function animateSwap(a, b) {
+  const elA = getTileEl(a);
+  const elB = getTileEl(b);
+  if (!elA || !elB) return Promise.resolve();
+  const { x, y } = cellDelta();
+  const dx = (b.c - a.c) * x;
+  const dy = (b.r - a.r) * y;
+  elA.style.zIndex = '2';
+  elB.style.zIndex = '2';
+  const p1 = elA.animate([
+    { transform: 'translate(0,0)' },
+    { transform: `translate(${dx}px, ${dy}px)` }
+  ], { duration: 180, easing: 'ease-in-out', fill: 'forwards' }).finished;
+  const p2 = elB.animate([
+    { transform: 'translate(0,0)' },
+    { transform: `translate(${-dx}px, ${-dy}px)` }
+  ], { duration: 180, easing: 'ease-in-out', fill: 'forwards' }).finished;
+  return Promise.all([p1, p2]).catch(() => {});
+}
+
+function animateDrops(drops) {
+  const { y } = cellDelta();
+  drops.forEach(({ row, col, distance }) => {
+    const el = getTileEl({ r: row, c: col });
+    if (!el || distance <= 0) return;
+    el.animate([
+      { transform: `translateY(${-distance * y}px) scale(0.96)`, opacity: 0.55 },
+      { transform: 'translateY(0) scale(1)', opacity: 1 }
+    ], { duration: Math.min(420, 130 + distance * 55), easing: 'cubic-bezier(.2,.8,.2,1)' });
+  });
 }
 
 function onTileClick(r, c) {
@@ -117,30 +162,46 @@ function playSound(kind='swap') {
   } catch {}
 }
 
-function refillMatched(matches, scoreIt=true) {
+function refillMatched(matches, scoreIt = true) {
   const cols = new Map();
   matches.forEach(([r, c]) => {
-    if (!cols.has(c)) cols.set(c, []);
-    cols.get(c).push(r);
+    if (!cols.has(c)) cols.set(c, new Set());
+    cols.get(c).add(r);
   });
 
-  for (const [c, rows] of cols.entries()) {
+  const drops = [];
+  for (const [c, rowSet] of cols.entries()) {
     const keep = [];
     for (let r = size - 1; r >= 0; r--) {
-      if (!rows.includes(r)) keep.push(board[r][c]);
+      if (!rowSet.has(r)) keep.push({ fruit: board[r][c], fromRow: r });
     }
-    for (let r = size - 1; r >= 0; r--) {
-      board[r][c] = keep[size - 1 - r] ?? randFruit();
+
+    let write = size - 1;
+    for (const item of keep) {
+      board[write][c] = item.fruit;
+      drops.push({ row: write, col: c, distance: write - item.fromRow });
+      write--;
+    }
+
+    let spawnIndex = 0;
+    while (write >= 0) {
+      board[write][c] = randFruit();
+      const fromRow = -1 - spawnIndex;
+      drops.push({ row: write, col: c, distance: write - fromRow });
+      spawnIndex++;
+      write--;
     }
   }
 
   if (scoreIt) {
     score += matches.length * 60 + Math.max(0, matches.length - 3) * 25 + combo * 20;
   }
+  return drops;
 }
 
 async function makeMove(a, b) {
   busy = true;
+  await animateSwap(a, b);
   swap(a, b);
   playSound('swap');
   selected = null;
@@ -148,7 +209,8 @@ async function makeMove(a, b) {
 
   let matches = findMatches();
   if (matches.length === 0) {
-    await sleep(180);
+    await sleep(60);
+    await animateSwap(a, b);
     swap(a, b);
     statusText.textContent = '这一步不能消除，已经自动换回。';
     busy = false;
@@ -162,9 +224,10 @@ async function makeMove(a, b) {
     combo++;
     playSound('clear');
     statusText.textContent = `消除 ${matches.length} 个水果，连击 x${combo}！`;
-    refillMatched(matches, true);
+    const drops = refillMatched(matches, true);
     render();
-    await sleep(220);
+    animateDrops(drops);
+    await sleep(320);
     matches = findMatches();
   }
 
