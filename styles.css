@@ -59,9 +59,10 @@ button { font: inherit; }
 }
 .tile:hover { transform: translateY(-1px); }
 .tile.selected { outline: 3px solid var(--tile-selected); transform: scale(1.03); }
+.tile.clearing { transform: scale(.78); opacity: .15; filter: brightness(1.35); }
 .particle {
   position: absolute; width: 12px; height: 12px; border-radius: 999px; pointer-events: none;
-  animation: pop .52s ease-out forwards;
+  animation: pop .56s ease-out forwards;
 }
 .sidebar { display: grid; gap: 16px; }
 .card { padding: 18px; }

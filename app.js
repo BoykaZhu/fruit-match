@@ -12,14 +12,16 @@ const cols = 6;
 const rows = 8;
 const baseGoal = 1800;
 const baseMoves = 18;
+const SWIPE_THRESHOLD = 18;
 let board = [];
-let selected = null;
 let score = 0;
 let movesLeft = baseMoves;
 let combo = 0;
 let level = 1;
 let busy = false;
 let audioCtx = null;
+let pointerStart = null;
+let activeTile = null;
 
 function goalScore() { return baseGoal + (level - 1) * 700; }
 function allowedMoves() { return Math.max(10, baseMoves - (level - 1)); }
@@ -39,9 +41,8 @@ function render() {
       btn.type = 'button';
       btn.dataset.row = r;
       btn.dataset.col = c;
-      if (selected && selected.r === r && selected.c === c) btn.classList.add('selected');
       btn.textContent = board[r][c];
-      btn.addEventListener('click', () => onTileClick(r, c));
+      attachPointerHandlers(btn, r, c);
       boardEl.appendChild(btn);
     }
   }
@@ -50,6 +51,46 @@ function render() {
   comboEl.textContent = combo;
   goalEl.textContent = goalScore();
   levelEl.textContent = level;
+}
+
+function attachPointerHandlers(btn, r, c) {
+  btn.addEventListener('pointerdown', (e) => {
+    if (busy || movesLeft <= 0) return;
+    pointerStart = { x: e.clientX, y: e.clientY, r, c };
+    activeTile = { r, c };
+    btn.classList.add('selected');
+  });
+
+  btn.addEventListener('pointermove', (e) => {
+    if (!pointerStart || busy) return;
+    const dx = e.clientX - pointerStart.x;
+    const dy = e.clientY - pointerStart.y;
+    if (Math.abs(dx) < SWIPE_THRESHOLD && Math.abs(dy) < SWIPE_THRESHOLD) return;
+
+    let target = null;
+    if (Math.abs(dx) > Math.abs(dy)) {
+      target = { r: pointerStart.r, c: pointerStart.c + (dx > 0 ? 1 : -1) };
+    } else {
+      target = { r: pointerStart.r + (dy > 0 ? 1 : -1), c: pointerStart.c };
+    }
+
+    clearPointerState();
+    if (target.r < 0 || target.r >= rows || target.c < 0 || target.c >= cols) return;
+    makeMove({ r: r, c: c }, target);
+  });
+
+  const end = () => clearPointerState();
+  btn.addEventListener('pointerup', end);
+  btn.addEventListener('pointercancel', end);
+  btn.addEventListener('pointerleave', () => {
+    if (!pointerStart) btn.classList.remove('selected');
+  });
+}
+
+function clearPointerState() {
+  pointerStart = null;
+  activeTile = null;
+  document.querySelectorAll('.tile.selected').forEach(el => el.classList.remove('selected'));
 }
 
 function getTileEl({ r, c }) {
@@ -63,13 +104,13 @@ function cellDelta() {
   return { x: first.offsetWidth + gap, y: first.offsetHeight + gap };
 }
 
-function animateSwap(a, b) {
+function animateSwap(a, b, duration = 180) {
   const elA = getTileEl(a), elB = getTileEl(b);
   if (!elA || !elB) return Promise.resolve();
   const { x, y } = cellDelta();
   const dx = (b.c - a.c) * x, dy = (b.r - a.r) * y;
-  const p1 = elA.animate([{ transform: 'translate(0,0)' }, { transform: `translate(${dx}px, ${dy}px)` }], { duration: 180, easing: 'ease-in-out', fill: 'forwards' }).finished;
-  const p2 = elB.animate([{ transform: 'translate(0,0)' }, { transform: `translate(${-dx}px, ${-dy}px)` }], { duration: 180, easing: 'ease-in-out', fill: 'forwards' }).finished;
+  const p1 = elA.animate([{ transform: 'translate(0,0)' }, { transform: `translate(${dx}px, ${dy}px)` }], { duration, easing: 'ease-in-out', fill: 'forwards' }).finished;
+  const p2 = elB.animate([{ transform: 'translate(0,0)' }, { transform: `translate(${-dx}px, ${-dy}px)` }], { duration, easing: 'ease-in-out', fill: 'forwards' }).finished;
   return Promise.all([p1, p2]).catch(() => {});
 }
 
@@ -79,10 +120,14 @@ function animateDrops(drops) {
     const el = getTileEl({ r: row, c: col });
     if (!el || distance <= 0) return;
     el.animate([
-      { transform: `translateY(${-distance * y}px) scale(.92)`, opacity: .45 },
+      { transform: `translateY(${-distance * y}px) scale(.94)`, opacity: .35 },
       { transform: 'translateY(0) scale(1)', opacity: 1 }
-    ], { duration: Math.min(450, 150 + distance * 60), easing: 'cubic-bezier(.2,.8,.2,1)' });
+    ], { duration: Math.min(520, 200 + distance * 65), easing: 'cubic-bezier(.2,.8,.2,1)' });
   });
+}
+
+function markClearing(matches) {
+  matches.forEach(([r, c]) => getTileEl({ r, c })?.classList.add('clearing'));
 }
 
 function burst(matches) {
@@ -91,30 +136,19 @@ function burst(matches) {
     if (!el) return;
     const rect = el.getBoundingClientRect();
     const parent = boardEl.getBoundingClientRect();
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 7; i++) {
       const p = document.createElement('span');
       p.className = 'particle';
       p.textContent = ['✨','💥','⭐'][i % 3];
       p.style.left = `${rect.left - parent.left + rect.width / 2 - 6}px`;
       p.style.top = `${rect.top - parent.top + rect.height / 2 - 6}px`;
-      p.style.setProperty('--dx', `${(Math.random() - 0.5) * 70}px`);
-      p.style.setProperty('--dy', `${(Math.random() - 0.5) * 70}px`);
+      p.style.setProperty('--dx', `${(Math.random() - 0.5) * 80}px`);
+      p.style.setProperty('--dy', `${(Math.random() - 0.5) * 80}px`);
       boardEl.appendChild(p);
-      setTimeout(() => p.remove(), 520);
+      setTimeout(() => p.remove(), 560);
     }
   });
 }
-
-function onTileClick(r, c) {
-  if (busy || movesLeft <= 0) return;
-  if (!selected) return selected = { r, c }, void render();
-  if (selected.r === r && selected.c === c) return selected = null, void render();
-  if (!isAdjacent(selected, { r, c })) return selected = { r, c }, void render();
-  makeMove(selected, { r, c });
-}
-
-function isAdjacent(a, b) { return Math.abs(a.r - b.r) + Math.abs(a.c - b.c) === 1; }
-function swap(a, b) { [board[a.r][a.c], board[b.r][b.c]] = [board[b.r][b.c], board[a.r][a.c]]; }
 
 function findMatches() {
   const matched = new Set();
@@ -166,39 +200,71 @@ function refillMatched(matches, scoreIt = true) {
 }
 
 async function makeMove(a, b) {
+  if (busy || movesLeft <= 0) return;
   busy = true;
-  await animateSwap(a, b);
-  swap(a, b); playSound('swap'); selected = null; render();
+  await animateSwap(a, b, 190);
+  swap(a, b);
+  playSound('swap');
+  render();
+
   let matches = findMatches();
   if (matches.length === 0) {
-    await sleep(60); await animateSwap(a, b); swap(a, b);
-    statusText.textContent = '这一步不能消除，已经自动换回。'; busy = false; render(); return;
+    await sleep(70);
+    await animateSwap(a, b, 190);
+    swap(a, b);
+    statusText.textContent = '这一步不能消除，已经自动换回。';
+    busy = false;
+    render();
+    return;
   }
-  movesLeft--; combo = 0;
+
+  movesLeft--;
+  combo = 0;
   while (matches.length > 0) {
-    combo++; playSound('clear'); burst(matches);
+    combo++;
     statusText.textContent = `消除 ${matches.length} 个水果，连击 x${combo}！`;
+    markClearing(matches);
+    playSound('clear');
+    burst(matches);
+    await sleep(260);
+
     const drops = refillMatched(matches, true);
-    render(); animateDrops(drops); await sleep(340); matches = findMatches();
+    render();
+    await sleep(80);
+    animateDrops(drops);
+    await sleep(420);
+    matches = findMatches();
   }
+
   if (score >= goalScore()) {
     playSound('win');
     level++;
     movesLeft = allowedMoves();
     statusText.textContent = `过关！进入第 ${level} 关，目标分数提升。`;
-    initBoard(); render();
+    initBoard();
+    render();
   } else if (movesLeft <= 0) {
     statusText.textContent = `步数用完了，当前 ${score} 分。点“新开一局”再来一把。`;
+    render();
   } else {
     statusText.textContent = `第 ${level} 关：当前 ${score} 分，还差 ${Math.max(0, goalScore() - score)} 分。`;
+    render();
   }
-  busy = false; render();
+
+  busy = false;
 }
 
-function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 function newGame() {
-  score = 0; combo = 0; level = 1; selected = null; busy = false; movesLeft = allowedMoves(); initBoard();
-  statusText.textContent = '新游戏开始，试试做个大连击吧 🍇'; render();
+  score = 0;
+  combo = 0;
+  level = 1;
+  busy = false;
+  movesLeft = allowedMoves();
+  clearPointerState();
+  initBoard();
+  statusText.textContent = '新游戏开始，按住水果往相邻方向滑动即可交换 🍇';
+  render();
 }
+
 newGameBtn.addEventListener('click', newGame);
 newGame();
