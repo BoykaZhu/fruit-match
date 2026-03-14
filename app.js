@@ -22,6 +22,7 @@ let busy = false;
 let audioCtx = null;
 let gesture = null;
 let swipeLocked = false;
+let clearingSet = new Set();
 
 function goalScore() { return baseGoal + (level - 1) * 700; }
 function allowedMoves() { return Math.max(10, baseMoves - (level - 1)); }
@@ -42,8 +43,10 @@ function render() {
       btn.draggable = false;
       btn.dataset.row = r;
       btn.dataset.col = c;
+      const key = `${r},${c}`;
       if (gesture && gesture.r === r && gesture.c === c) btn.classList.add('selected');
-      btn.textContent = board[r][c];
+      if (clearingSet.has(key)) btn.classList.add('clearing');
+      btn.textContent = board[r][c] ?? '';
       boardEl.appendChild(btn);
     }
   }
@@ -100,7 +103,8 @@ function animateDrops(drops) {
 }
 
 function markClearing(matches) {
-  matches.forEach(([r, c]) => getTileEl({ r, c })?.classList.add('clearing'));
+  clearingSet = new Set(matches.map(([r, c]) => `${r},${c}`));
+  for (const [r, c] of matches) board[r][c] = null;
 }
 
 function burst(matches) {
@@ -196,12 +200,13 @@ async function makeMove(a, b) {
   while (matches.length > 0) {
     combo++;
     statusText.textContent = `消除 ${matches.length} 个水果，连击 x${combo}！`;
-    render();
     markClearing(matches);
+    render();
     playSound('clear');
     burst(matches);
     await sleep(300);
     const drops = refillMatched(matches, true);
+    clearingSet = new Set();
     render();
     await sleep(110);
     animateDrops(drops);
@@ -266,7 +271,7 @@ function handleBoardPointerEnd(e) {
 
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 function newGame() {
-  score = 0; combo = 0; level = 1; busy = false; movesLeft = allowedMoves(); clearGesture(); initBoard();
+  score = 0; combo = 0; level = 1; busy = false; movesLeft = allowedMoves(); clearGesture(); clearingSet = new Set(); initBoard();
   statusText.textContent = '新游戏开始，按住水果往相邻方向滑动即可交换 🍇'; render();
 }
 
